@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import { connectDB } from "./config/db";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth";
+import itemRoutes from "./routes/itemRoutes";
+import uploadRoutes from "./routes/uploadRoutes";
 
 dotenv.config();
 
@@ -18,7 +20,11 @@ app.use(cors({
 app.use(express.json());
 
 // Auth routes
-app.all("/api/auth/*", toNodeHandler(auth));
+app.all("/api/auth/*path", toNodeHandler(auth));
+
+// API Routes
+app.use("/api/items", itemRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Basic route
 app.get("/", (req, res) => {
