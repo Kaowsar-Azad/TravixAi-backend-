@@ -30,3 +30,20 @@ export const requireAuth = async (
     res.status(500).json({ error: "Internal server error during authentication" });
   }
 };
+
+export const requireRole = (roles: string[]) => {
+  return async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+    // Ensure requireAuth ran first
+    if (!req.user) {
+      await requireAuth(req, res, () => {});
+      if (res.headersSent) return;
+    }
+    
+    if (!req.user || !roles.includes(req.user.role)) {
+      res.status(403).json({ error: "Access denied. Insufficient permissions." });
+      return;
+    }
+    
+    next();
+  };
+};

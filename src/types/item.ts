@@ -7,7 +7,7 @@ export interface TravelPlan {
   fullDescription: string;
   price: string;
   duration: string;
-  imageUrl: string;
+  images: string[];
   category: string;
   userId: string; // the Better Auth user ID (string)
   createdAt: Date;

@@ -13,6 +13,6 @@ const upload = multer({
   },
 });
 
-router.post("/", requireAuth as any, upload.single("image"), uploadImage as any);
+router.post("/", upload.single("image"), uploadImage as any);
 
 export default router;

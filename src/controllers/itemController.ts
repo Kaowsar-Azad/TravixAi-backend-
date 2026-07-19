@@ -8,7 +8,7 @@ const collectionName = "travel_plans";
 
 export const createItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { title, shortDescription, fullDescription, price, duration, imageUrl, category } = req.body;
+    const { title, shortDescription, fullDescription, price, duration, images, category } = req.body;
     
     // Basic validation
     if (!title || !shortDescription || !price || !duration) {
@@ -22,7 +22,7 @@ export const createItem = async (req: AuthenticatedRequest, res: Response): Prom
       fullDescription: fullDescription || "",
       price,
       duration,
-      imageUrl: imageUrl || "",
+      images: Array.isArray(images) ? images : (images ? [images] : []),
       category: category || "Uncategorized",
       userId: req.user.id,
       createdAt: new Date(),
@@ -93,5 +93,61 @@ export const deleteItem = async (req: AuthenticatedRequest, res: Response): Prom
   } catch (error) {
     console.error("Delete item error:", error);
     res.status(500).json({ error: "Failed to delete travel plan" });
+  }
+};
+
+export const getMyItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const items = await db.collection(collectionName)
+      .find({ userId: req.user.id })
+      .sort({ createdAt: -1 })
+      .toArray();
+    res.status(200).json(items);
+  } catch (error) {
+    console.error("Get my items error:", error);
+    res.status(500).json({ error: "Failed to fetch your travel plans" });
+  }
+};
+
+export const updateItem = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    if (!ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid ID format" });
+      return;
+    }
+
+    const { title, shortDescription, fullDescription, price, duration, images, category } = req.body;
+    
+    // Check if it exists and belongs to the user
+    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
+    if (!item) {
+      res.status(404).json({ error: "Travel plan not found" });
+      return;
+    }
+
+    if (item.userId !== req.user.id) {
+      res.status(403).json({ error: "You do not have permission to edit this travel plan" });
+      return;
+    }
+
+    const updateDoc = {
+      $set: {
+        ...(title && { title }),
+        ...(shortDescription && { shortDescription }),
+        ...(fullDescription !== undefined && { fullDescription }),
+        ...(price && { price }),
+        ...(duration && { duration }),
+        ...(images !== undefined && { images: Array.isArray(images) ? images : (images ? [images] : []) }),
+        ...(category && { category }),
+        updatedAt: new Date()
+      }
+    };
+
+    await db.collection(collectionName).updateOne({ _id: new ObjectId(id) }, updateDoc);
+    res.status(200).json({ message: "Travel plan updated successfully" });
+  } catch (error) {
+    console.error("Update item error:", error);
+    res.status(500).json({ error: "Failed to update travel plan" });
   }
 };
