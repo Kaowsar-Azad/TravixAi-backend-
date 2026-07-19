@@ -98,10 +98,43 @@ export const deleteItem = async (req: AuthenticatedRequest, res: Response): Prom
 
 export const getMyItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const items = await db.collection(collectionName)
-      .find({ userId: req.user.id })
-      .sort({ createdAt: -1 })
-      .toArray();
+    const items = await db.collection(collectionName).aggregate([
+      { $match: { userId: req.user.id } },
+      {
+        $lookup: {
+          from: "bookings",
+          localField: "_id",
+          foreignField: "planId",
+          as: "bookings"
+        }
+      },
+      {
+        $project: {
+          _id: 1,
+          title: 1,
+          shortDescription: 1,
+          fullDescription: 1,
+          price: 1,
+          duration: 1,
+          images: 1,
+          category: 1,
+          createdAt: 1,
+          updatedAt: 1,
+          userId: 1,
+          totalBookings: { $size: "$bookings" },
+          pendingRequests: {
+            $size: {
+              $filter: {
+                input: "$bookings",
+                as: "booking",
+                cond: { $eq: ["$$booking.status", "Requested"] }
+              }
+            }
+          }
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ]).toArray();
     res.status(200).json(items);
   } catch (error) {
     console.error("Get my items error:", error);

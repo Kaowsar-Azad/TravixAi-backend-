@@ -118,7 +118,10 @@ export const checkBooking = async (req: AuthenticatedRequest, res: Response): Pr
       userId: req.user.id
     });
 
-    res.status(200).json({ hasBooked: !!existingBooking });
+    res.status(200).json({ 
+      hasBooked: !!existingBooking,
+      status: existingBooking ? existingBooking.status : null 
+    });
   } catch (error) {
     console.error("Check booking error:", error);
     res.status(500).json({ error: "Failed to check booking status" });
