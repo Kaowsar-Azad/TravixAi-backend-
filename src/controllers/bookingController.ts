@@ -28,8 +28,22 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response): P
     });
 
     if (existingBooking) {
-      res.status(400).json({ error: "You have already booked this plan" });
-      return;
+      if (existingBooking.status === "Confirmed") {
+        res.status(400).json({ error: "You have already booked this plan and it is confirmed" });
+        return;
+      }
+      if (existingBooking.status === "Requested") {
+        res.status(400).json({ error: "You have already requested to book this plan" });
+        return;
+      }
+      if (existingBooking.status === "Rejected") {
+        await db.collection(bookingsCollection).updateOne(
+          { _id: existingBooking._id },
+          { $set: { status: "Requested", bookingDate: new Date() } }
+        );
+        res.status(200).json({ message: "Booking requested again successfully", bookingId: existingBooking._id });
+        return;
+      }
     }
 
     const newBooking = {
