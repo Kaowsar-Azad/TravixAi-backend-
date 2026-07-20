@@ -1,17 +1,14 @@
 import { Request, Response } from 'express';
 
-export default async (req: Request, res: Response) => {
+export default (req: Request, res: Response) => {
   try {
-    // Dynamically import the app to catch initialization errors (e.g., DB connect or dotenv)
-    // @ts-ignore
-    const appModule = await import('../src/server');
-    const app = appModule.default || appModule;
-    // @ts-ignore
+    // Use synchronous require so Vercel's esbuild statically bundles it
+    const app = require('../src/server').default;
     return app(req, res);
   } catch (err: any) {
-    console.error("Vercel Function Crash Error:", err);
+    console.error("Vercel Module Load Crash Error:", err);
     res.status(500).json({
-      error: "Vercel Function Initialization Error",
+      error: "Vercel Module Load Error",
       message: err.message,
       stack: err.stack,
       name: err.name
