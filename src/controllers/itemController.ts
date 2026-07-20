@@ -40,7 +40,7 @@ export const createItem = async (req: AuthenticatedRequest, res: Response): Prom
 export const getItems = async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit } = req.query;
-    const query = { isCustomized: { $ne: true } };
+    const query: any = { isCustomized: { $ne: true } };
 
     if (!page && !limit) {
       const items = await db.collection(collectionName).find(query).sort({ createdAt: -1 }).toArray();
