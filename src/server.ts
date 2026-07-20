@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
+
 import { connectDB } from "./config/db";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "./lib/auth";
@@ -8,8 +10,7 @@ import itemRoutes from "./routes/itemRoutes";
 import uploadRoutes from "./routes/uploadRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import bookingRoutes from "./routes/bookingRoutes";
-
-dotenv.config();
+import aiRoutes from "./routes/aiRoutes";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -29,6 +30,7 @@ app.use("/api/items", itemRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Basic route
 app.get("/", (req, res) => {

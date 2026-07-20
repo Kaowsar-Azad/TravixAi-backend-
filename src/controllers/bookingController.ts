@@ -83,9 +83,13 @@ export const getBookingsByPlan = async (req: AuthenticatedRequest, res: Response
       return;
     }
 
+    // Find all customized plans derived from this base plan
+    const customizedPlans = await db.collection(plansCollection).find({ basePlanId: new ObjectId(planId) }).project({ _id: 1 }).toArray();
+    const planIdsToMatch = [new ObjectId(planId), ...customizedPlans.map(p => p._id)];
+
     // Fetch bookings and join with user data
     const bookings = await db.collection(bookingsCollection).aggregate([
-      { $match: { planId: new ObjectId(planId) } },
+      { $match: { planId: { $in: planIdsToMatch } } },
       {
         $lookup: {
           from: usersCollection,
@@ -104,6 +108,8 @@ export const getBookingsByPlan = async (req: AuthenticatedRequest, res: Response
           _id: 1,
           bookingDate: 1,
           status: 1,
+          planId: 1,
+          planTitle: 1,
           "user.name": "$userDetails.name",
           "user.email": "$userDetails.email",
           "user.image": "$userDetails.image"
@@ -184,5 +190,44 @@ export const updateBookingStatus = async (req: AuthenticatedRequest, res: Respon
   } catch (error) {
     console.error("Update booking status error:", error);
     res.status(500).json({ error: "Failed to update booking status" });
+  }
+};
+
+export const getMyBookings = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const bookings = await db.collection(bookingsCollection).aggregate([
+      { $match: { userId: req.user.id } },
+      {
+        $lookup: {
+          from: plansCollection,
+          let: { planIdStr: "$planId" },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$planIdStr"] } } }
+          ],
+          as: "planDetails"
+        }
+      },
+      {
+        $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true }
+      },
+      {
+        $project: {
+          _id: 1,
+          bookingDate: 1,
+          status: 1,
+          planId: 1,
+          planTitle: 1,
+          "plan.price": "$planDetails.price",
+          "plan.duration": "$planDetails.duration",
+          "plan.images": "$planDetails.images"
+        }
+      },
+      { $sort: { bookingDate: -1 } }
+    ]).toArray();
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Get my bookings error:", error);
+    res.status(500).json({ error: "Failed to fetch your bookings" });
   }
 };

@@ -1,8 +1,11 @@
 import { Router } from "express";
-import { createBooking, getBookingsByPlan, checkBooking, updateBookingStatus } from "../controllers/bookingController";
+import { createBooking, getBookingsByPlan, checkBooking, updateBookingStatus, getMyBookings } from "../controllers/bookingController";
 import { requireAuth, requireRole } from "../middleware/authMiddleware";
 
 const router = Router();
+
+// Get current user's bookings
+router.get("/my-bookings", requireAuth as any, getMyBookings as any);
 
 // Travelers (and others) can create a booking
 router.post("/", requireAuth as any, createBooking as any);

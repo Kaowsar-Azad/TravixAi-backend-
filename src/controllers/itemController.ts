@@ -39,7 +39,7 @@ export const createItem = async (req: AuthenticatedRequest, res: Response): Prom
 
 export const getItems = async (req: Request, res: Response): Promise<void> => {
   try {
-    const items = await db.collection(collectionName).find({}).sort({ createdAt: -1 }).toArray();
+    const items = await db.collection(collectionName).find({ isCustomized: { $ne: true } }).sort({ createdAt: -1 }).toArray();
     res.status(200).json(items);
   } catch (error) {
     console.error("Get items error:", error);
@@ -99,12 +99,22 @@ export const deleteItem = async (req: AuthenticatedRequest, res: Response): Prom
 export const getMyItems = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const items = await db.collection(collectionName).aggregate([
-      { $match: { userId: req.user.id } },
+      { $match: { userId: req.user.id, isCustomized: { $ne: true } } },
+      {
+        $lookup: {
+          from: "travel_plans",
+          localField: "_id",
+          foreignField: "basePlanId",
+          as: "derivedPlans"
+        }
+      },
       {
         $lookup: {
           from: "bookings",
-          localField: "_id",
-          foreignField: "planId",
+          let: { planIds: { $concatArrays: [["$_id"], "$derivedPlans._id"] } },
+          pipeline: [
+            { $match: { $expr: { $in: ["$planId", "$$planIds"] } } }
+          ],
           as: "bookings"
         }
       },
