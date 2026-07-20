@@ -3,10 +3,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const uri = process.env.MONGODB_URI;
+const uri = process.env.MONGODB_URI || "mongodb://localhost:27017/travix-fallback";
 
-if (!uri) {
-  throw new Error("MONGODB_URI is not defined in the environment variables.");
+if (!process.env.MONGODB_URI) {
+  console.warn("WARNING: MONGODB_URI is not defined in environment variables!");
 }
 
 export const mongoClient = new MongoClient(uri);
