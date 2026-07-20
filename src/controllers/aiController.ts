@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { AuthenticatedRequest } from '../middleware/authMiddleware';
+import { ChatSession } from '../models/ChatSession';
 import { geminiService } from '../services/geminiService';
 import { db } from '../config/db';
 import { ObjectId } from 'mongodb';
@@ -104,5 +106,66 @@ Duration: ${basePlan.duration}
   } catch (error: any) {
     console.error('Error in customizePlan:', error);
     return res.status(500).json({ error: 'Failed to customize travel plan', details: error.message });
+  }
+};
+
+export const getChats = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const chats = await db.collection('ai_chats').find({ userId }).sort({ updatedAt: -1 }).toArray();
+    return res.json({ success: true, chats });
+  } catch (error: any) {
+    console.error('Error fetching chats:', error);
+    return res.status(500).json({ error: 'Failed to fetch chats' });
+  }
+};
+
+export const saveChat = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { sessionId, title, messages } = req.body;
+    if (!sessionId) return res.status(400).json({ error: 'Session ID is required' });
+
+    const updateData = {
+      userId,
+      sessionId,
+      title: title || 'New Chat',
+      messages: messages || [],
+      updatedAt: Date.now(),
+    };
+
+    const result = await db.collection('ai_chats').updateOne(
+      { sessionId, userId },
+      { $set: updateData, $setOnInsert: { createdAt: Date.now() } },
+      { upsert: true }
+    );
+
+    return res.json({ success: true, message: 'Chat saved successfully' });
+  } catch (error: any) {
+    console.error('Error saving chat:', error);
+    return res.status(500).json({ error: 'Failed to save chat' });
+  }
+};
+
+export const deleteChat = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params; // this is the sessionId
+    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+    const result = await db.collection('ai_chats').deleteOne({ sessionId: id, userId });
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    return res.json({ success: true, message: 'Chat deleted' });
+  } catch (error: any) {
+    console.error('Error deleting chat:', error);
+    return res.status(500).json({ error: 'Failed to delete chat' });
   }
 };
