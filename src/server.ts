@@ -37,8 +37,8 @@ app.get("/", (req, res) => {
   res.send("TravelX AI Backend is running");
 });
 
-// Connect to DB for serverless environment
-connectDB().catch(console.error);
+// Connect to DB on demand (MongoDB driver handles this automatically)
+// connectDB().catch(console.error);
 
 // Only listen on a port if not in production (Vercel sets NODE_ENV=production)
 if (process.env.NODE_ENV !== "production") {
