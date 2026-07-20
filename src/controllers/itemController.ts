@@ -37,13 +37,48 @@ export const createItem = async (req: AuthenticatedRequest, res: Response): Prom
   }
 };
 
+const getAggregatePipeline = (matchQuery: any, skipNum?: number, limitNum?: number) => {
+  const pipeline: any[] = [
+    { $match: matchQuery },
+    { $sort: { createdAt: -1 } }
+  ];
+  if (typeof skipNum === "number") {
+    pipeline.push({ $skip: skipNum });
+  }
+  if (typeof limitNum === "number") {
+    pipeline.push({ $limit: limitNum });
+  }
+  pipeline.push(
+    {
+      $lookup: {
+        from: "reviews",
+        localField: "_id",
+        foreignField: "planId",
+        as: "itemReviews"
+      }
+    },
+    {
+      $addFields: {
+        reviewsCount: { $size: "$itemReviews" },
+        averageRating: { $avg: "$itemReviews.rating" }
+      }
+    },
+    {
+      $project: {
+        itemReviews: 0
+      }
+    }
+  );
+  return pipeline;
+};
+
 export const getItems = async (req: Request, res: Response): Promise<void> => {
   try {
     const { page, limit } = req.query;
     const query: any = { isCustomized: { $ne: true } };
 
     if (!page && !limit) {
-      const items = await db.collection(collectionName).find(query).sort({ createdAt: -1 }).toArray();
+      const items = await db.collection(collectionName).aggregate(getAggregatePipeline(query)).toArray();
       res.status(200).json(items);
       return;
     }
@@ -62,10 +97,7 @@ export const getItems = async (req: Request, res: Response): Promise<void> => {
 
     const totalItems = await db.collection(collectionName).countDocuments(query);
     const items = await db.collection(collectionName)
-      .find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limitNum)
+      .aggregate(getAggregatePipeline(query, skip, limitNum))
       .toArray();
 
     const totalPages = Math.ceil(totalItems / limitNum);
@@ -93,13 +125,16 @@ export const getItemById = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
-    if (!item) {
+    const items = await db.collection(collectionName)
+      .aggregate(getAggregatePipeline({ _id: new ObjectId(id) }))
+      .toArray();
+
+    if (!items || items.length === 0) {
       res.status(404).json({ error: "Travel plan not found" });
       return;
     }
 
-    res.status(200).json(item);
+    res.status(200).json(items[0]);
   } catch (error) {
     console.error("Get item by ID error:", error);
     res.status(500).json({ error: "Failed to fetch travel plan" });
@@ -251,13 +286,11 @@ export const getRelatedItems = async (req: Request, res: Response): Promise<void
     
     // Find related items by category, excluding the current one
     const relatedItems = await db.collection(collectionName)
-      .find({
+      .aggregate(getAggregatePipeline({
         category,
         _id: { $ne: new ObjectId(id) },
         isCustomized: { $ne: true }
-      })
-      .sort({ createdAt: -1 })
-      .limit(3)
+      }, undefined, 3))
       .toArray();
 
     // If we don't have enough related items in the same category, we can fetch fallback items
@@ -266,12 +299,10 @@ export const getRelatedItems = async (req: Request, res: Response): Promise<void
       const excludeIds = [new ObjectId(id), ...relatedItems.map(ri => ri._id)];
       
       const fallbackItems = await db.collection(collectionName)
-        .find({
+        .aggregate(getAggregatePipeline({
           _id: { $nin: excludeIds },
           isCustomized: { $ne: true }
-        })
-        .sort({ createdAt: -1 })
-        .limit(needed)
+        }, undefined, needed))
         .toArray();
         
       relatedItems.push(...fallbackItems);

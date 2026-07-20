@@ -96,12 +96,46 @@ var createItem = async (req, res) => {
     res.status(500).json({ error: "Failed to create travel plan" });
   }
 };
+var getAggregatePipeline = (matchQuery, skipNum, limitNum) => {
+  const pipeline = [
+    { $match: matchQuery },
+    { $sort: { createdAt: -1 } }
+  ];
+  if (typeof skipNum === "number") {
+    pipeline.push({ $skip: skipNum });
+  }
+  if (typeof limitNum === "number") {
+    pipeline.push({ $limit: limitNum });
+  }
+  pipeline.push(
+    {
+      $lookup: {
+        from: "reviews",
+        localField: "_id",
+        foreignField: "planId",
+        as: "itemReviews"
+      }
+    },
+    {
+      $addFields: {
+        reviewsCount: { $size: "$itemReviews" },
+        averageRating: { $avg: "$itemReviews.rating" }
+      }
+    },
+    {
+      $project: {
+        itemReviews: 0
+      }
+    }
+  );
+  return pipeline;
+};
 var getItems = async (req, res) => {
   try {
     const { page, limit } = req.query;
     const query = { isCustomized: { $ne: true } };
     if (!page && !limit) {
-      const items2 = await db.collection(collectionName).find(query).sort({ createdAt: -1 }).toArray();
+      const items2 = await db.collection(collectionName).aggregate(getAggregatePipeline(query)).toArray();
       res.status(200).json(items2);
       return;
     }
@@ -116,7 +150,7 @@ var getItems = async (req, res) => {
       ];
     }
     const totalItems = await db.collection(collectionName).countDocuments(query);
-    const items = await db.collection(collectionName).find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum).toArray();
+    const items = await db.collection(collectionName).aggregate(getAggregatePipeline(query, skip, limitNum)).toArray();
     const totalPages = Math.ceil(totalItems / limitNum);
     res.status(200).json({
       items,
@@ -139,12 +173,12 @@ var getItemById = async (req, res) => {
       res.status(400).json({ error: "Invalid ID format" });
       return;
     }
-    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
-    if (!item) {
+    const items = await db.collection(collectionName).aggregate(getAggregatePipeline({ _id: new ObjectId(id) })).toArray();
+    if (!items || items.length === 0) {
       res.status(404).json({ error: "Travel plan not found" });
       return;
     }
-    res.status(200).json(item);
+    res.status(200).json(items[0]);
   } catch (error) {
     console.error("Get item by ID error:", error);
     res.status(500).json({ error: "Failed to fetch travel plan" });
@@ -277,18 +311,18 @@ var getRelatedItems = async (req, res) => {
       return;
     }
     const category = item.category || "Uncategorized";
-    const relatedItems = await db.collection(collectionName).find({
+    const relatedItems = await db.collection(collectionName).aggregate(getAggregatePipeline({
       category,
       _id: { $ne: new ObjectId(id) },
       isCustomized: { $ne: true }
-    }).sort({ createdAt: -1 }).limit(3).toArray();
+    }, void 0, 3)).toArray();
     if (relatedItems.length < 3) {
       const needed = 3 - relatedItems.length;
       const excludeIds = [new ObjectId(id), ...relatedItems.map((ri) => ri._id)];
-      const fallbackItems = await db.collection(collectionName).find({
+      const fallbackItems = await db.collection(collectionName).aggregate(getAggregatePipeline({
         _id: { $nin: excludeIds },
         isCustomized: { $ne: true }
-      }).sort({ createdAt: -1 }).limit(needed).toArray();
+      }, void 0, needed)).toArray();
       relatedItems.push(...fallbackItems);
     }
     res.status(200).json(relatedItems);
