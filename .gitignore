@@ -91,7 +91,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist - intentionally tracked for Vercel deployment
 
 # Gatsby files
 .cache/
