@@ -32,7 +32,7 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { jwt } from "better-auth/plugins";
 var auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || "fallback_secret_for_vercel_build_only",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:5000",
+  baseURL: process.env.BETTER_AUTH_URL || "https://travix-ai-backend.vercel.app",
   plugins: [
     jwt()
   ],
@@ -1004,7 +1004,11 @@ dotenv2.config();
 var app = express();
 var PORT = process.env.PORT || 5e3;
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",
+    "https://travix-ai-frontend.vercel.app",
+    /\.vercel\.app$/
+  ],
   credentials: true
 }));
 app.use(express.json());

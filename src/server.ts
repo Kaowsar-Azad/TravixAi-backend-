@@ -17,7 +17,11 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",
+    "https://travix-ai-frontend.vercel.app",
+    /\.vercel\.app$/,
+  ],
   credentials: true,
 }));
 app.use(express.json());

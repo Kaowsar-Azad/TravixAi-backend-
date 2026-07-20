@@ -5,7 +5,7 @@ import { db } from "../config/db";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || "fallback_secret_for_vercel_build_only",
-  baseURL: process.env.BETTER_AUTH_URL || "http://localhost:5000",
+  baseURL: process.env.BETTER_AUTH_URL || "https://travix-ai-backend.vercel.app",
   plugins: [
     jwt(),
   ],
