@@ -39,8 +39,46 @@ export const createItem = async (req: AuthenticatedRequest, res: Response): Prom
 
 export const getItems = async (req: Request, res: Response): Promise<void> => {
   try {
-    const items = await db.collection(collectionName).find({ isCustomized: { $ne: true } }).sort({ createdAt: -1 }).toArray();
-    res.status(200).json(items);
+    const { page, limit } = req.query;
+    const query = { isCustomized: { $ne: true } };
+
+    if (!page && !limit) {
+      const items = await db.collection(collectionName).find(query).sort({ createdAt: -1 }).toArray();
+      res.status(200).json(items);
+      return;
+    }
+
+    const pageNum = parseInt(page as string) || 1;
+    const limitNum = parseInt(limit as string) || 9;
+    const skip = (pageNum - 1) * limitNum;
+
+    const { search: searchParam } = req.query;
+    if (searchParam) {
+      query.$or = [
+        { title: { $regex: searchParam as string, $options: "i" } },
+        { shortDescription: { $regex: searchParam as string, $options: "i" } }
+      ];
+    }
+
+    const totalItems = await db.collection(collectionName).countDocuments(query);
+    const items = await db.collection(collectionName)
+      .find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
+      .toArray();
+
+    const totalPages = Math.ceil(totalItems / limitNum);
+
+    res.status(200).json({
+      items,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalItems,
+        limit: limitNum
+      }
+    });
   } catch (error) {
     console.error("Get items error:", error);
     res.status(500).json({ error: "Failed to fetch travel plans" });
@@ -194,3 +232,149 @@ export const updateItem = async (req: AuthenticatedRequest, res: Response): Prom
     res.status(500).json({ error: "Failed to update travel plan" });
   }
 };
+
+export const getRelatedItems = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    if (!ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid ID format" });
+      return;
+    }
+
+    const item = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
+    if (!item) {
+      res.status(404).json({ error: "Travel plan not found" });
+      return;
+    }
+
+    const category = item.category || "Uncategorized";
+    
+    // Find related items by category, excluding the current one
+    const relatedItems = await db.collection(collectionName)
+      .find({
+        category,
+        _id: { $ne: new ObjectId(id) },
+        isCustomized: { $ne: true }
+      })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .toArray();
+
+    // If we don't have enough related items in the same category, we can fetch fallback items
+    if (relatedItems.length < 3) {
+      const needed = 3 - relatedItems.length;
+      const excludeIds = [new ObjectId(id), ...relatedItems.map(ri => ri._id)];
+      
+      const fallbackItems = await db.collection(collectionName)
+        .find({
+          _id: { $nin: excludeIds },
+          isCustomized: { $ne: true }
+        })
+        .sort({ createdAt: -1 })
+        .limit(needed)
+        .toArray();
+        
+      relatedItems.push(...fallbackItems);
+    }
+
+    res.status(200).json(relatedItems);
+  } catch (error) {
+    console.error("Get related items error:", error);
+    res.status(500).json({ error: "Failed to fetch related travel plans" });
+  }
+};
+
+export const getReviews = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    if (!ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid ID format" });
+      return;
+    }
+
+    const reviews = await db.collection("reviews")
+      .find({ planId: new ObjectId(id) })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json(reviews);
+  } catch (error) {
+    console.error("Get reviews error:", error);
+    res.status(500).json({ error: "Failed to fetch reviews" });
+  }
+};
+
+export const createReview = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    if (!ObjectId.isValid(id)) {
+      res.status(400).json({ error: "Invalid ID format" });
+      return;
+    }
+
+    const { rating, comment } = req.body;
+    if (!rating || typeof rating !== "number" || rating < 1 || rating > 5) {
+      res.status(400).json({ error: "Rating must be a number between 1 and 5" });
+      return;
+    }
+
+    if (!comment || typeof comment !== "string" || !comment.trim()) {
+      res.status(400).json({ error: "Comment is required" });
+      return;
+    }
+
+    const plan = await db.collection(collectionName).findOne({ _id: new ObjectId(id) });
+    if (!plan) {
+      res.status(404).json({ error: "Travel plan not found" });
+      return;
+    }
+
+    const planIdsToCheck = [new ObjectId(id)];
+    if (plan.basePlanId) {
+      planIdsToCheck.push(new ObjectId(plan.basePlanId));
+    }
+    const derivedPlans = await db.collection(collectionName)
+      .find({ basePlanId: new ObjectId(id) })
+      .project({ _id: 1 })
+      .toArray();
+    derivedPlans.forEach(dp => planIdsToCheck.push(dp._id));
+
+    const confirmedBooking = await db.collection("bookings").findOne({
+      planId: { $in: planIdsToCheck },
+      userId: req.user.id,
+      status: "Confirmed"
+    });
+
+    if (!confirmedBooking) {
+      res.status(403).json({ error: "You can only review travel plans that you have booked and had confirmed by the agent" });
+      return;
+    }
+
+    const existingReview = await db.collection("reviews").findOne({
+      planId: new ObjectId(id),
+      userId: req.user.id
+    });
+
+    if (existingReview) {
+      res.status(400).json({ error: "You have already reviewed this travel plan" });
+      return;
+    }
+
+    const newReview = {
+      planId: new ObjectId(id),
+      userId: req.user.id,
+      userName: req.user.name || "Anonymous",
+      userImage: req.user.image || "",
+      rating,
+      comment: comment.trim(),
+      createdAt: new Date()
+    };
+
+    await db.collection("reviews").insertOne(newReview);
+    res.status(201).json({ message: "Review submitted successfully", review: newReview });
+  } catch (error) {
+    console.error("Create review error:", error);
+    res.status(500).json({ error: "Failed to submit review" });
+  }
+};
+

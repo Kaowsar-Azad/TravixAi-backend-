@@ -9,6 +9,18 @@ export const auth = betterAuth({
   plugins: [
     jwt(),
   ],
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID || "dummy_id",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "dummy_secret",
+    }
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    }
+  },
   database: mongodbAdapter(db),
   emailAndPassword: {
     enabled: true,

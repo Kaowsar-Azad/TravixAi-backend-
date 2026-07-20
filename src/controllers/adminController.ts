@@ -24,9 +24,29 @@ export const getAdminStats = async (req: AuthenticatedRequest, res: Response): P
     // Recent plans
     const recentPlans = await plansCollection.find().sort({ createdAt: -1 }).limit(5).toArray();
     
-    // Top agents (aggregation to count plans per agent)
+    // Top agents (aggregation to count plans per agent and fetch user details)
     const topAgents = await plansCollection.aggregate([
+      { $match: { userId: { $ne: null, $exists: true, $regex: /^[0-9a-fA-F]{24}$/ } } },
       { $group: { _id: "$userId", planCount: { $sum: 1 } } },
+      {
+        $lookup: {
+          from: "user",
+          let: { agentId: { $toObjectId: "$_id" } },
+          pipeline: [
+            { $match: { $expr: { $eq: ["$_id", "$$agentId"] } } }
+          ],
+          as: "agentDetails"
+        }
+      },
+      { $unwind: { path: "$agentDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          planCount: 1,
+          name: "$agentDetails.name",
+          email: "$agentDetails.email"
+        }
+      },
       { $sort: { planCount: -1 } },
       { $limit: 5 }
     ]).toArray();
