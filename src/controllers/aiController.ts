@@ -89,7 +89,7 @@ Duration: ${basePlan.duration}
       agentEmail: basePlan.agentEmail,
       userId: basePlan.userId, // keep the original agent as the owner
       isCustomized: true, // flag
-      basePlanId: basePlan._id,
+      basePlanId: basePlan.basePlanId ? basePlan.basePlanId : basePlan._id,
       createdAt: new Date(),
     };
 
