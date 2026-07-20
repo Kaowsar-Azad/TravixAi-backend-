@@ -37,12 +37,14 @@ app.get("/", (req, res) => {
   res.send("TravelX AI Backend is running");
 });
 
-// Start server
-const startServer = async () => {
-  await connectDB();
+// Connect to DB for serverless environment
+connectDB().catch(console.error);
+
+// Only listen on a port if not in production (Vercel sets NODE_ENV=production)
+if (process.env.NODE_ENV !== "production") {
   app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
   });
-};
+}
 
-startServer();
+export default app;
