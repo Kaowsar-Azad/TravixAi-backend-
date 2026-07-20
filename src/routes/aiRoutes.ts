@@ -11,8 +11,8 @@ router.post('/chat', upload.single('file'), chatAgent);
 router.post('/customize', customizePlan);
 
 // Chat history routes
-router.get('/chats', requireAuth, getChats);
-router.post('/chats', requireAuth, saveChat);
-router.delete('/chats/:id', requireAuth, deleteChat);
+router.get('/chats', getChats);
+router.post('/chats', saveChat);
+router.delete('/chats/:id', deleteChat);
 
 export default router;

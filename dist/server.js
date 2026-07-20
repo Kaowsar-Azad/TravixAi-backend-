@@ -1025,12 +1025,65 @@ Duration: ${basePlan.duration}
     return res.status(500).json({ error: "Failed to customize travel plan", details: error.message });
   }
 };
+var getChats = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const chats = await db.collection("ai_chats").find({ userId }).sort({ updatedAt: -1 }).toArray();
+    return res.json({ success: true, chats });
+  } catch (error) {
+    console.error("Error fetching chats:", error);
+    return res.status(500).json({ error: "Failed to fetch chats" });
+  }
+};
+var saveChat = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const { sessionId, title, messages } = req.body;
+    if (!sessionId) return res.status(400).json({ error: "Session ID is required" });
+    const updateData = {
+      userId,
+      sessionId,
+      title: title || "New Chat",
+      messages: messages || [],
+      updatedAt: Date.now()
+    };
+    const result = await db.collection("ai_chats").updateOne(
+      { sessionId, userId },
+      { $set: updateData, $setOnInsert: { createdAt: Date.now() } },
+      { upsert: true }
+    );
+    return res.json({ success: true, message: "Chat saved successfully" });
+  } catch (error) {
+    console.error("Error saving chat:", error);
+    return res.status(500).json({ error: "Failed to save chat" });
+  }
+};
+var deleteChat = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+    const result = await db.collection("ai_chats").deleteOne({ sessionId: id, userId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: "Chat not found" });
+    }
+    return res.json({ success: true, message: "Chat deleted" });
+  } catch (error) {
+    console.error("Error deleting chat:", error);
+    return res.status(500).json({ error: "Failed to delete chat" });
+  }
+};
 
 // src/routes/aiRoutes.ts
 var upload2 = multer2({ storage: multer2.memoryStorage() });
 var router5 = Router5();
 router5.post("/chat", upload2.single("file"), chatAgent);
 router5.post("/customize", customizePlan);
+router5.get("/chats", requireAuth, getChats);
+router5.post("/chats", requireAuth, saveChat);
+router5.delete("/chats/:id", requireAuth, deleteChat);
 var aiRoutes_default = router5;
 
 // src/server.ts

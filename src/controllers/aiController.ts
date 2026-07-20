@@ -109,10 +109,10 @@ Duration: ${basePlan.duration}
   }
 };
 
-export const getChats = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+export const getChats = async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.query.userId as string;
+    if (!userId) return res.status(400).json({ error: 'User ID is required' });
 
     const chats = await db.collection('ai_chats').find({ userId }).sort({ updatedAt: -1 }).toArray();
     return res.json({ success: true, chats });
@@ -122,12 +122,10 @@ export const getChats = async (req: AuthenticatedRequest, res: Response): Promis
   }
 };
 
-export const saveChat = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+export const saveChat = async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-
-    const { sessionId, title, messages } = req.body;
+    const { userId, sessionId, title, messages } = req.body;
+    if (!userId) return res.status(400).json({ error: 'User ID is required' });
     if (!sessionId) return res.status(400).json({ error: 'Session ID is required' });
 
     const updateData = {
@@ -151,11 +149,11 @@ export const saveChat = async (req: AuthenticatedRequest, res: Response): Promis
   }
 };
 
-export const deleteChat = async (req: AuthenticatedRequest, res: Response): Promise<any> => {
+export const deleteChat = async (req: Request, res: Response): Promise<any> => {
   try {
-    const userId = req.user?.id;
     const { id } = req.params; // this is the sessionId
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = req.body.userId;
+    if (!userId) return res.status(400).json({ error: 'User ID is required' });
 
     const result = await db.collection('ai_chats').deleteOne({ sessionId: id, userId });
     
