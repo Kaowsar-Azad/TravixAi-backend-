@@ -140,7 +140,8 @@ export const checkBooking = async (req: AuthenticatedRequest, res: Response): Pr
 
     res.status(200).json({ 
       hasBooked: !!existingBooking,
-      status: existingBooking ? existingBooking.status : null 
+      status: existingBooking ? existingBooking.status : null,
+      bookingId: existingBooking ? existingBooking._id : null
     });
   } catch (error) {
     console.error("Check booking error:", error);
@@ -231,3 +232,38 @@ export const getMyBookings = async (req: AuthenticatedRequest, res: Response): P
     res.status(500).json({ error: "Failed to fetch your bookings" });
   }
 };
+
+export const cancelBooking = async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const bookingId = req.params.bookingId as string;
+
+    if (!ObjectId.isValid(bookingId)) {
+      res.status(400).json({ error: "Invalid booking ID format" });
+      return;
+    }
+
+    const booking = await db.collection(bookingsCollection).findOne({ _id: new ObjectId(bookingId) });
+    if (!booking) {
+      res.status(404).json({ error: "Booking not found" });
+      return;
+    }
+
+    if (booking.userId !== req.user.id) {
+      res.status(403).json({ error: "Access denied. You can only cancel your own bookings." });
+      return;
+    }
+
+    if (booking.status !== "Requested") {
+      res.status(400).json({ error: `Cannot cancel booking with status: ${booking.status}` });
+      return;
+    }
+
+    await db.collection(bookingsCollection).deleteOne({ _id: new ObjectId(bookingId) });
+
+    res.status(200).json({ message: "Booking cancelled successfully" });
+  } catch (error) {
+    console.error("Cancel booking error:", error);
+    res.status(500).json({ error: "Failed to cancel booking" });
+  }
+};
+
