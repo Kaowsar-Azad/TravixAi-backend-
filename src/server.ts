@@ -38,12 +38,20 @@ app.get("/", (req, res) => {
 });
 
 // Connect to DB on demand (MongoDB driver handles this automatically)
-// connectDB().catch(console.error);
-
 // Only listen on a port if not in production (Vercel sets NODE_ENV=production)
 if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+  connectDB().then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on http://localhost:${PORT}`);
+    });
+  }).catch(err => {
+    console.error("Failed to connect to database on startup:", err);
+  });
+} else {
+  // In production, just connect to DB and let Vercel handle the request
+  // Catch any errors to prevent unhandled promise rejection from crashing the Vercel function!
+  connectDB().catch(err => {
+    console.error("Vercel MongoDB Connection Error:", err);
   });
 }
 
