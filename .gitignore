@@ -73,10 +73,6 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
-.env
-.env.test
-.env.production
-.env.local
 .env.development.local
 .env.test.local
 .env.production.local
@@ -123,3 +119,12 @@ out
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Environment variables & secrets (added by GitHub Guardian)
+*.env
+!.env.example
+!.env.sample
+.envrc
+.venv/
+venv/
+config.bat
