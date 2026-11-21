@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node init && tsx watch src/server.ts",
-    "build": "node init && tsup",
-    "start": "node init && node dist/server.js"
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
